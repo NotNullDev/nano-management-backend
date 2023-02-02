@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/nano-management-backend.iml" filepath="$PROJECT_DIR$/.idea/nano-management-backend.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../nano-management-mantine/.idea/nano-management-mantine.iml" filepath="$PROJECT_DIR$/../nano-management-mantine/.idea/nano-management-mantine.iml" />
     </modules>
   </component>
 </project>
