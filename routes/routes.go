@@ -14,11 +14,19 @@ type TestType struct {
 
 func InitCustomRoutes(app *pocketbase.PocketBase) {
 	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
+
 		e.Router.GET("/test",
 			func(c echo.Context) error {
 				return GetDashboardSummary(c, app)
 			},
 		)
+
+		e.Router.GET("/tasks-history",
+			func(c echo.Context) error {
+				return GetTasksHistory(c, app)
+			},
+		)
+
 		return nil
 	})
 }
