@@ -33,8 +33,7 @@ type TasksHistoryRecord struct {
 	TaskId       string `json:"taskId"`
 	TaskDate     string `json:"taskDate"`
 	TaskDuration int    `json:"taskDuration"`
-	TaskAccepted string `json:"taskAccepted"`
-	TaskRejected string `json:"taskRejected"`
+	TaskStatus   string `json:"taskStatus"`
 	TaskComment  string `json:"taskComment"`
 
 	ActivityId   string `json:"activityId"`
@@ -89,8 +88,7 @@ func GetTasksHistory(c echo.Context, app *pocketbase.PocketBase) error {
 	baseQuery := app.Dao().DB().Select("t.id as task_id",
 		"t.date as task_date",
 		"t.duration as task_duration",
-		"t.accepted as task_accepted",
-		"t.rejected as task_rejected",
+		"t.status as task_status",
 		"t.comment as task_comment",
 		"act.id as activity_id",
 		"act.name as activity_name",
@@ -160,15 +158,8 @@ func parseParamsAndAppendToSelectQuery(selectQuery *dbx.SelectQuery, params Task
 	}
 
 	if params.StatusFilter != "" {
-		if params.StatusFilter == "accepted" {
-			exp := dbx.NewExp("t.accepted = ''")
-			selectQuery.AndWhere(dbx.Not(exp))
-		}
-
-		if params.StatusFilter == "rejected" {
-			exp := dbx.NewExp("t.rejected = ''")
-			selectQuery.AndWhere(dbx.Not(exp))
-		}
+		exp := dbx.NewExp("t.status = {:statusFilter}", dbx.Params{"statusFilter": params.StatusFilter})
+		selectQuery.AndWhere(exp)
 	}
 
 	if params.DateFromFilter != "" {
