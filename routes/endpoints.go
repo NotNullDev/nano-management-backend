@@ -14,7 +14,7 @@ func GetDashboardSummary(c echo.Context, app *pocketbase.PocketBase) error {
 
 	user := c.Get(apis.ContextAuthRecordKey).(*models.Record)
 
-	app.Dao().DB().NewQuery(`
+	err := app.Dao().DB().NewQuery(`
 				select
 					teams.name as team_name, sum(tasks.duration) as tasks_sum, strftime('%m.%Y', tasks.date) as date
 				from tasks
@@ -26,7 +26,151 @@ func GetDashboardSummary(c echo.Context, app *pocketbase.PocketBase) error {
 		Bind(dbx.Params{"userId": user.Id}).
 		All(&tests)
 
+	if err != nil {
+		return err
+	}
+
 	return c.JSON(200, tests)
+}
+
+/*
+select
+    pr.id as project_id ,pr.name as project_name,
+    tm.id as team_id, tm.name as team_name,
+    strftime('%d.%m.%Y', date) as date, sum(duration) as duration_summary
+from tasks t
+inner join teams tm on t.team = tm.id
+inner join projects pr on tm.project = pr.id
+group by strftime('%d.%m.%Y', date), tm.id;
+*/
+
+type ManagementDataQueryParams struct {
+	Team string `query:"teamId"`
+}
+
+type ManagementData struct {
+	UserId    string `json:"userId"`
+	UserName  string `json:"userName"`
+	UserEmail string `json:"userEmail"`
+
+	ProjectId   string `json:"projectId"`
+	ProjectName string `json:"projectName"`
+
+	TeamId   string `json:"teamId"`
+	TeamName string `json:"teamName"`
+
+	Date            string `json:"date"`
+	DurationSummary int    `json:"durationSummary"`
+}
+
+func GetManagementData(c echo.Context, app *pocketbase.PocketBase) error {
+	var result []ManagementData
+	var queryParams ManagementDataQueryParams
+
+	if err := c.Bind(&queryParams); err != nil {
+		return err
+	}
+
+	currentUser := c.Get(apis.ContextAuthRecordKey).(*models.Record)
+
+	if currentUser == nil {
+		return c.JSON(401, "User is not authenticated")
+	}
+
+	selectQuery := app.Dao().DB().Select(
+		"u.id as user_id", "u.name as user_name", "u.email as user_email",
+		"pr.id as project_id", "pr.name as project_name",
+		"tm.id as team_id", "tm.name as team_name",
+		"strftime('%d.%m.%Y',date) as date",
+		"sum(duration) as duration_summary",
+	).
+		From("tasks t").
+		InnerJoin("teams tm", dbx.NewExp("t.team = tm.id")).
+		InnerJoin("projects pr", dbx.NewExp("tm.project = pr.id")).
+		InnerJoin("users u", dbx.NewExp("t.user = u.id")).
+		GroupBy("strftime('%d.%m.%Y',date)", "tm.id", "pr.id", "u.id")
+
+	if queryParams.Team != "" {
+		selectQuery.AndWhere(dbx.NewExp("tm.id = {:teamId}", dbx.Params{"teamId": queryParams.Team}))
+	}
+
+	err := selectQuery.All(&result)
+
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(200, result)
+}
+
+type UpdateTaskStatusParams struct {
+	Days   []string `json:"days"`
+	UserId string   `json:"userId"`
+	Status string   `json:"status"`
+}
+
+func UpdateTasksStatuses(c echo.Context, app *pocketbase.PocketBase) error {
+	var tasksToUpdate UpdateTaskStatusParams
+
+	if err := c.Bind(&tasksToUpdate); err != nil {
+		return err
+	}
+
+	if len(tasksToUpdate.Days) == 0 {
+		return c.JSON(200, "No tasks to update")
+	}
+
+	nextTaskStatus := GetTaskStatus(tasksToUpdate.Status)
+
+	in := ""
+
+	for _, day := range tasksToUpdate.Days {
+		in += day
+	}
+
+	in = in[:len(in)-2]
+
+	sql := `
+	update tasks
+	set status = {:status}
+	where 
+	    	user = {:userId} 
+		and strftime('%d.%m.%Y', date) in ({:days})
+`
+	result, err := app.Dao().DB().NewQuery(sql).Bind(dbx.Params{
+		"status": nextTaskStatus,
+		"userId": tasksToUpdate.UserId,
+		"days":   in,
+	}).Execute()
+
+	if err != nil {
+		return err
+	}
+
+	//result, err := app.Dao().DB().
+	//	Update("tasks", dbx.Params{
+	//		"status": nextTaskStatus,
+	//	}, whereStatement).Execute()
+
+	if err != nil {
+		return err
+	}
+
+	affected, _ := result.RowsAffected()
+
+	return c.JSON(200, affected)
+}
+
+func GetTaskStatus(status string) string {
+	if status == "accepted" {
+		return "accepted"
+	}
+
+	if status == "rejected" {
+		return "rejected"
+	}
+
+	return "none"
 }
 
 type TasksHistoryRecord struct {

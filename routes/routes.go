@@ -30,6 +30,14 @@ func InitCustomRoutes(app *pocketbase.PocketBase) {
 			apis.ActivityLogger(app),
 		)
 
+		e.Router.GET("/management-data", func(c echo.Context) error {
+			return GetManagementData(c, app)
+		}, apis.ActivityLogger(app))
+
+		e.Router.POST("/update-tasks-statuses", func(c echo.Context) error {
+			return UpdateTasksStatuses(c, app)
+		})
+
 		return nil
 	})
 }
