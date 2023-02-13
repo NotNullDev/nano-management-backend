@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"fmt"
 	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase"
@@ -181,6 +182,8 @@ type TasksHistoryRecord struct {
 	UserId    string `json:"userId"`
 	UserName  string `json:"userName"`
 	UserEmail string `json:"userEmail"`
+
+	AllCount int `json:"allCount"`
 }
 
 type TaskHistoryParams struct {
@@ -242,7 +245,47 @@ func GetTasksHistory(c echo.Context, app *pocketbase.PocketBase) error {
 
 	var tasksHistory []TasksHistoryRecord
 
-	err := baseQuery.Build().All(&tasksHistory)
+	rawSqlBase := baseQuery.Build().SQL()
+
+	baseQueryWithoutLimit := app.Dao().DB().Select("t.id as task_id",
+		"t.date as task_date",
+		"t.duration as task_duration",
+		"t.status as task_status",
+		"t.comment as task_comment",
+		"act.id as activity_id",
+		"act.name as activity_name",
+		"tm.id as team_id",
+		"tm.name as team_name",
+		"pr.id as project_id",
+		"pr.name as project_name",
+		"u.id as user_id",
+		"u.name as user_name",
+		"u.email as user_email").
+		From("tasks t").
+		InnerJoin("activities act", dbx.NewExp("t.activity = act.id")).
+		InnerJoin("teams tm", dbx.NewExp("t.team = tm.id")).
+		InnerJoin("projects pr", dbx.NewExp("tm.project = pr.id")).
+		InnerJoin("users u", dbx.NewExp("t.user = u.id"))
+
+	params.Limit = ""
+	params.Page = ""
+
+	parseParamsAndAppendToSelectQuery(baseQueryWithoutLimit, params)
+
+	rawSQLWithoutLimit := baseQueryWithoutLimit.Build().SQL()
+
+	tasksWithCount := fmt.Sprintf(`
+select *, (select count(*) from (
+                         %s
+                     )) as all_count from (
+                         %s
+                     ) as tasks;
+`, rawSQLWithoutLimit, rawSqlBase)
+
+	err := app.Dao().DB().NewQuery(tasksWithCount).All(&tasksHistory)
+	if err != nil {
+		return err
+	}
 
 	if err != nil {
 		return c.JSON(200, "omg !!!")
@@ -329,6 +372,8 @@ func parseParamsAndAppendToSelectQuery(selectQuery *dbx.SelectQuery, params Task
 		}
 
 		pageOffset, err := strconv.ParseInt(params.Page, 10, 64)
+
+		pageOffset = (pageOffset - 1) * pageLimit
 
 		if err != nil {
 			pageOffset = 0
