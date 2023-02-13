@@ -94,6 +94,8 @@ func GetManagementData(c echo.Context, app *pocketbase.PocketBase) error {
 		selectQuery.AndWhere(dbx.NewExp("tm.id = {:teamId}", dbx.Params{"teamId": queryParams.Team}))
 	}
 
+	selectQuery.AndWhere(dbx.NewExp("t.status = 'none'", dbx.Params{"teamId": queryParams.Team}))
+
 	err := selectQuery.All(&result)
 
 	if err != nil {
@@ -122,35 +124,22 @@ func UpdateTasksStatuses(c echo.Context, app *pocketbase.PocketBase) error {
 
 	nextTaskStatus := GetTaskStatus(tasksToUpdate.Status)
 
-	in := ""
+	var asInterfaces []interface{}
 
 	for _, day := range tasksToUpdate.Days {
-		in += day
+		asInterfaces = append(asInterfaces, day)
 	}
 
-	in = in[:len(in)-2]
-
-	sql := `
-	update tasks
-	set status = {:status}
-	where 
-	    	user = {:userId} 
-		and strftime('%d.%m.%Y', date) in ({:days})
-`
-	result, err := app.Dao().DB().NewQuery(sql).Bind(dbx.Params{
-		"status": nextTaskStatus,
-		"userId": tasksToUpdate.UserId,
-		"days":   in,
-	}).Execute()
-
-	if err != nil {
-		return err
-	}
-
-	//result, err := app.Dao().DB().
-	//	Update("tasks", dbx.Params{
-	//		"status": nextTaskStatus,
-	//	}, whereStatement).Execute()
+	result, err := app.Dao().DB().
+		Update("tasks",
+			dbx.Params{
+				"status": nextTaskStatus,
+			},
+			dbx.And(
+				dbx.NewExp("user = {:userId}", dbx.Params{"userId": tasksToUpdate.UserId}),
+				dbx.In("strftime('%d.%m.%Y', date)", asInterfaces...),
+			)).
+		Execute()
 
 	if err != nil {
 		return err
