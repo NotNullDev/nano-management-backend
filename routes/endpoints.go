@@ -282,7 +282,7 @@ select *, (select count(*) from (
                      ) as tasks;
 `, rawSQLWithoutLimit, rawSqlBase)
 
-	err := app.Dao().DB().NewQuery(tasksWithCount).All(&tasksHistory)
+	err := app.Dao().DB().NewQuery(tasksWithCount).Bind(baseQueryWithoutLimit.Build().Params()).All(&tasksHistory)
 	if err != nil {
 		return err
 	}
