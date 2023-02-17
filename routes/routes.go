@@ -16,25 +16,27 @@ type TestType struct {
 func InitCustomRoutes(app *pocketbase.PocketBase) {
 	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
 
-		e.Router.GET("/dashboard-summary",
+		g := e.Router.Group("/api")
+
+		g.GET("/dashboard-summary",
 			func(c echo.Context) error {
 				return GetDashboardSummary(c, app)
 			},
 			apis.ActivityLogger(app),
 		)
 
-		e.Router.GET("/tasks-history",
+		g.GET("/tasks-history",
 			func(c echo.Context) error {
 				return GetTasksHistory(c, app)
 			},
 			apis.ActivityLogger(app),
 		)
 
-		e.Router.GET("/management-data", func(c echo.Context) error {
+		g.GET("/management-data", func(c echo.Context) error {
 			return GetManagementData(c, app)
 		}, apis.ActivityLogger(app))
 
-		e.Router.POST("/update-tasks-statuses", func(c echo.Context) error {
+		g.POST("/update-tasks-statuses", func(c echo.Context) error {
 			return UpdateTasksStatuses(c, app)
 		})
 
