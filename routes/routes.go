@@ -23,6 +23,7 @@ func InitCustomRoutes(app *pocketbase.PocketBase) {
 				return GetDashboardSummary(c, app)
 			},
 			apis.ActivityLogger(app),
+			apis.RequireRecordAuth(),
 		)
 
 		g.GET("/tasks-history",
@@ -30,15 +31,18 @@ func InitCustomRoutes(app *pocketbase.PocketBase) {
 				return GetTasksHistory(c, app)
 			},
 			apis.ActivityLogger(app),
+			apis.RequireRecordAuth(),
 		)
 
 		g.GET("/management-data", func(c echo.Context) error {
 			return GetManagementData(c, app)
-		}, apis.ActivityLogger(app))
+		}, apis.ActivityLogger(app), apis.RequireRecordAuth(),
+		)
 
 		g.POST("/update-tasks-statuses", func(c echo.Context) error {
 			return UpdateTasksStatuses(c, app)
-		})
+		}, apis.ActivityLogger(app), apis.RequireRecordAuth(),
+		)
 
 		return nil
 	})
