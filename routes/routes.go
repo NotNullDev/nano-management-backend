@@ -15,7 +15,6 @@ type TestType struct {
 
 func InitCustomRoutes(app *pocketbase.PocketBase) {
 	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-
 		g := e.Router.Group("/api")
 
 		g.GET("/dashboard-summary",
